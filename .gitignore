@@ -1,0 +1,4 @@
+monitor.env
+monitor.log
+launchd.*.log
+__pycache__/
