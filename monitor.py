@@ -99,8 +99,11 @@ def parse_tiles(html: str):
 def matches(tile: dict) -> bool:
     dims = tile.get("filters", {}).get("dimensions", {})
     title = tile.get("title", "") or ""
+    # 13-inch via either the dimension field OR the title (more robust: the
+    # screensize dimension can vanish when stock churns, but the title is stable)
+    is_13 = dims.get("dimensionScreensize") == TARGET_SCREEN or "13-inch" in title
     return (
-        dims.get("dimensionScreensize") == TARGET_SCREEN
+        is_13
         and dims.get("tsMemorySize") == TARGET_MEMORY
         and TARGET_CHIP in title
         and TARGET_PRODUCT in title
