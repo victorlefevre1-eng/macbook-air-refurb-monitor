@@ -3,7 +3,7 @@
 Apple US Refurbished monitor — alerts on Telegram when a target MacBook Air
 configuration appears in the refurbished store.
 
-Target (default): 13-inch, Apple M4 chip, 24GB unified memory.
+Target (default): 13-inch, Apple M4 chip, 16GB or 24GB unified memory.
 Runs once per invocation; schedule it every 10 min with launchd/cron.
 
 Config is read from monitor.env (same folder) or environment variables:
@@ -31,7 +31,7 @@ UA = ("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
 
 # --- Target filter -----------------------------------------------------------
 TARGET_SCREEN = "13inch"
-TARGET_MEMORY = "24gb"
+TARGET_MEMORY = {"16gb", "24gb"}   # alert for either RAM size
 TARGET_CHIP = "M4"          # must appear in title
 TARGET_PRODUCT = "MacBook Air"
 
@@ -104,7 +104,7 @@ def matches(tile: dict) -> bool:
     is_13 = dims.get("dimensionScreensize") == TARGET_SCREEN or "13-inch" in title
     return (
         is_13
-        and dims.get("tsMemorySize") == TARGET_MEMORY
+        and dims.get("tsMemorySize") in TARGET_MEMORY
         and TARGET_CHIP in title
         and TARGET_PRODUCT in title
     )
@@ -172,7 +172,7 @@ def main() -> int:
     if "--test" in sys.argv:
         ok = send_telegram(token, chat_id,
                            "✅ MacBook Air monitor is live. I'll ping you when a "
-                           "13\" M4 / 24GB refurb appears (US store).")
+                           "13\" M4 (16GB or 24GB) refurb appears (US store).")
         log(f"test message sent: {ok}")
         return 0 if ok else 1
 
@@ -198,9 +198,12 @@ def main() -> int:
         pstr = f"${price:,.2f}" if price is not None else "n/a"
         savings = t.get("price", {}).get("savings", "")
         title = t.get("title", "")
+        ram = (t.get("filters", {}).get("dimensions", {})
+               .get("tsMemorySize", "") or "").upper()
         msg = (
-            "🚨 <b>MacBook Air 13\" M4 / 24GB dispo en refurb US !</b>\n\n"
+            f"🚨 <b>MacBook Air 13\" M4 / {ram} dispo en refurb US !</b>\n\n"
             f"<b>{title}</b>\n"
+            f"🧠 {ram}\n"
             f"💵 {pstr}  {savings}\n"
             f"🔗 {link_of(t)}\n\n"
             f"<i>Part: {t.get('partNumber')}</i>"
