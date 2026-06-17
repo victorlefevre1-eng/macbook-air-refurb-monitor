@@ -14,6 +14,7 @@ Config is read from monitor.env (same folder) or environment variables:
 import json
 import os
 import re
+import subprocess
 import sys
 import time
 import urllib.request
@@ -34,6 +35,10 @@ TARGET_SCREEN = "13inch"
 TARGET_MEMORY = {"16gb", "24gb"}   # alert for either RAM size
 TARGET_CHIP = "M4"          # must appear in title
 TARGET_PRODUCT = "MacBook Air"
+
+# Configs for which we auto-open the checkout page in the browser (local only).
+# Gated by env AUTO_OPEN_CHECKOUT=1 so the cloud run never tries to drive a browser.
+BUY_MEMORY = {"24gb"}
 
 
 def log(msg: str) -> None:
@@ -125,6 +130,18 @@ def link_of(tile: dict) -> str:
     return url or PAGE_URL
 
 
+def open_checkout(url: str) -> None:
+    """Open the product page (and best-effort click Add to Bag) in the browser.
+    Only the page-open is guaranteed; the click needs browser Apple Events +
+    Automation permission. Never touches payment."""
+    helper = HERE / "open_and_bag.sh"
+    try:
+        subprocess.Popen(["/bin/bash", str(helper), url])
+        log(f"AUTO-CHECKOUT: opened browser at {url}")
+    except Exception as e:  # noqa: BLE001
+        log(f"open_checkout failed: {e}")
+
+
 def send_telegram(token: str, chat_id: str, text: str) -> bool:
     api = f"https://api.telegram.org/bot{token}/sendMessage"
     data = urllib.parse.urlencode({
@@ -211,6 +228,10 @@ def main() -> int:
         if send_telegram(token, chat_id, msg):
             seen.add(t.get("partNumber"))
             log(f"ALERT sent for {t.get('partNumber')} @ {pstr}")
+            # auto-open checkout for the buy-target memory (local only)
+            mem = t.get("filters", {}).get("dimensions", {}).get("tsMemorySize")
+            if os.environ.get("AUTO_OPEN_CHECKOUT") == "1" and mem in BUY_MEMORY:
+                open_checkout(link_of(t))
 
     # keep only part numbers still listed, so a SKU re-alerts if it returns later
     current = {t.get("partNumber") for t in hits}
